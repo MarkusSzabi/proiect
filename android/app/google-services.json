@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "668396135194",
+    "project_id": "smart-driver-assitant",
+    "storage_bucket": "smart-driver-assitant.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:668396135194:android:4b2e51875cc12626c382a3",
+        "android_client_info": {
+          "package_name": "com.company.smartdriverassistant"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB7uDvVW8Pv0u_QAtJShDDoYXEGOEAZwLM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
