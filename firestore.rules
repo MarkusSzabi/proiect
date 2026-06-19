@@ -1,0 +1,349 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function hasOnlyKeys(allowed) {
+      return request.resource.data.keys().hasOnly(allowed);
+    }
+
+    function hasAllKeys(required) {
+      return request.resource.data.keys().hasAll(required);
+    }
+
+    function isNonEmptyString(value, maxLen) {
+      return value is string && value.size() > 0 && value.size() <= maxLen;
+    }
+
+    function isOptionalString(value, maxLen) {
+      return !(value is string) || value.size() <= maxLen;
+    }
+
+    function isPositiveNumber(value) {
+      return value is int || value is float
+        ? value >= 0
+        : false;
+    }
+
+    function userDocPath() {
+      return /databases/$(database)/documents/users/$(request.auth.uid);
+    }
+
+    function requestBelongsToCurrentUser() {
+      return isSignedIn() && request.resource.data.userId == request.auth.uid;
+    }
+
+    function resourceBelongsToCurrentUser() {
+      return isSignedIn() && resource.data.userId == request.auth.uid;
+    }
+
+    match /users/{userId} {
+      allow read: if isOwner(userId);
+
+      allow create: if isOwner(userId)
+        && hasOnlyKeys([
+          'uid',
+          'email',
+          'displayName',
+          'createdAt',
+          'photoUrl'
+        ])
+        && request.resource.data.uid == request.auth.uid
+        && isNonEmptyString(request.resource.data.email, 120)
+        && isNonEmptyString(request.resource.data.displayName, 80)
+        && request.resource.data.createdAt is timestamp
+        && (!('photoUrl' in request.resource.data) || isOptionalString(request.resource.data.photoUrl, 500));
+
+      allow update: if isOwner(userId)
+        && request.resource.data.uid == resource.data.uid
+        && request.resource.data.email == resource.data.email
+        && request.resource.data.createdAt == resource.data.createdAt
+        && hasOnlyKeys([
+          'uid',
+          'email',
+          'displayName',
+          'createdAt',
+          'photoUrl'
+        ])
+        && isNonEmptyString(request.resource.data.displayName, 80)
+        && (!('photoUrl' in request.resource.data) || isOptionalString(request.resource.data.photoUrl, 500));
+
+      allow delete: if false;
+    }
+
+    match /vehicles/{vehicleId} {
+      allow read: if resourceBelongsToCurrentUser();
+
+      allow create: if requestBelongsToCurrentUser()
+        && hasAllKeys([
+          'userId',
+          'make',
+          'model',
+          'year',
+          'licensePlate',
+          'initialMileageKm',
+          'currentMileageKm',
+          'fuelType',
+          'isActive',
+          'createdAt'
+        ])
+        && hasOnlyKeys([
+          'userId',
+          'make',
+          'model',
+          'year',
+          'licensePlate',
+          'initialMileageKm',
+          'currentMileageKm',
+          'fuelType',
+          'color',
+          'vin',
+          'isActive',
+          'createdAt'
+        ])
+        && isNonEmptyString(request.resource.data.make, 60)
+        && isNonEmptyString(request.resource.data.model, 60)
+        && request.resource.data.year is int
+        && request.resource.data.year >= 1900
+        && request.resource.data.year <= 2100
+        && isNonEmptyString(request.resource.data.licensePlate, 20)
+        && isPositiveNumber(request.resource.data.initialMileageKm)
+        && isPositiveNumber(request.resource.data.currentMileageKm)
+        && request.resource.data.currentMileageKm >= request.resource.data.initialMileageKm
+        && isNonEmptyString(request.resource.data.fuelType, 30)
+        && request.resource.data.isActive is bool
+        && request.resource.data.createdAt is timestamp
+        && (!('color' in request.resource.data) || isOptionalString(request.resource.data.color, 40))
+        && (!('vin' in request.resource.data) || isOptionalString(request.resource.data.vin, 40));
+
+      allow update: if resourceBelongsToCurrentUser()
+        && requestBelongsToCurrentUser()
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.userId == resource.data.userId
+        && hasOnlyKeys([
+          'userId',
+          'make',
+          'model',
+          'year',
+          'licensePlate',
+          'initialMileageKm',
+          'currentMileageKm',
+          'fuelType',
+          'color',
+          'vin',
+          'isActive',
+          'createdAt'
+        ])
+        && isNonEmptyString(request.resource.data.make, 60)
+        && isNonEmptyString(request.resource.data.model, 60)
+        && request.resource.data.year is int
+        && request.resource.data.year >= 1900
+        && request.resource.data.year <= 2100
+        && isNonEmptyString(request.resource.data.licensePlate, 20)
+        && isPositiveNumber(request.resource.data.initialMileageKm)
+        && isPositiveNumber(request.resource.data.currentMileageKm)
+        && request.resource.data.currentMileageKm >= 0
+        && isNonEmptyString(request.resource.data.fuelType, 30)
+        && request.resource.data.isActive is bool
+        && (!('color' in request.resource.data) || isOptionalString(request.resource.data.color, 40))
+        && (!('vin' in request.resource.data) || isOptionalString(request.resource.data.vin, 40));
+
+      allow delete: if resourceBelongsToCurrentUser();
+    }
+
+    match /trips/{tripId} {
+      allow read: if resourceBelongsToCurrentUser();
+
+      allow create: if requestBelongsToCurrentUser()
+        && hasAllKeys([
+          'userId',
+          'vehicleId',
+          'startTime',
+          'distanceKm',
+          'isActive',
+          'category',
+          'createdAt'
+        ])
+        && hasOnlyKeys([
+          'userId',
+          'vehicleId',
+          'startTime',
+          'endTime',
+          'startLocationName',
+          'endLocationName',
+          'distanceKm',
+          'isActive',
+          'category',
+          'createdAt'
+        ])
+        && isNonEmptyString(request.resource.data.vehicleId, 80)
+        && request.resource.data.startTime is timestamp
+        && (!('endTime' in request.resource.data) || request.resource.data.endTime is timestamp)
+        && (!('startLocationName' in request.resource.data) || isOptionalString(request.resource.data.startLocationName, 150))
+        && (!('endLocationName' in request.resource.data) || isOptionalString(request.resource.data.endLocationName, 150))
+        && isPositiveNumber(request.resource.data.distanceKm)
+        && request.resource.data.isActive is bool
+        && request.resource.data.category is string
+        && request.resource.data.category in ['personal', 'business']
+        && request.resource.data.createdAt is timestamp;
+
+      allow update: if resourceBelongsToCurrentUser()
+        && requestBelongsToCurrentUser()
+        && request.resource.data.userId == resource.data.userId
+        && request.resource.data.vehicleId == resource.data.vehicleId
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.startTime == resource.data.startTime
+        && hasOnlyKeys([
+          'userId',
+          'vehicleId',
+          'startTime',
+          'endTime',
+          'startLocationName',
+          'endLocationName',
+          'distanceKm',
+          'isActive',
+          'category',
+          'createdAt'
+        ])
+        && (!('endTime' in request.resource.data) || request.resource.data.endTime is timestamp)
+        && (!('startLocationName' in request.resource.data) || isOptionalString(request.resource.data.startLocationName, 150))
+        && (!('endLocationName' in request.resource.data) || isOptionalString(request.resource.data.endLocationName, 150))
+        && isPositiveNumber(request.resource.data.distanceKm)
+        && request.resource.data.isActive is bool
+        && request.resource.data.category is string
+        && request.resource.data.category in ['personal', 'business'];
+
+      allow delete: if resourceBelongsToCurrentUser();
+    }
+
+    match /documents/{documentId} {
+      allow read: if resourceBelongsToCurrentUser();
+
+      allow create: if requestBelongsToCurrentUser()
+        && hasAllKeys([
+          'userId',
+          'vehicleId',
+          'type',
+          'expiryDate',
+          'reminderDaysBefore',
+          'createdAt'
+        ])
+        && hasOnlyKeys([
+          'userId',
+          'vehicleId',
+          'type',
+          'expiryDate',
+          'reminderDaysBefore',
+          'notes',
+          'createdAt'
+        ])
+        && isNonEmptyString(request.resource.data.vehicleId, 80)
+        && request.resource.data.type is string
+        && request.resource.data.type in ['insurance', 'itp', 'rovinieta', 'rca', 'casco', 'other']
+        && request.resource.data.expiryDate is timestamp
+        && request.resource.data.reminderDaysBefore is int
+        && request.resource.data.reminderDaysBefore >= 0
+        && request.resource.data.reminderDaysBefore <= 365
+        && (!('notes' in request.resource.data) || isOptionalString(request.resource.data.notes, 500))
+        && request.resource.data.createdAt is timestamp;
+
+      allow update: if resourceBelongsToCurrentUser()
+        && requestBelongsToCurrentUser()
+        && request.resource.data.userId == resource.data.userId
+        && request.resource.data.vehicleId == resource.data.vehicleId
+        && request.resource.data.createdAt == resource.data.createdAt
+        && hasOnlyKeys([
+          'userId',
+          'vehicleId',
+          'type',
+          'expiryDate',
+          'reminderDaysBefore',
+          'notes',
+          'createdAt'
+        ])
+        && request.resource.data.type is string
+        && request.resource.data.type in ['insurance', 'itp', 'rovinieta', 'rca', 'casco', 'other']
+        && request.resource.data.expiryDate is timestamp
+        && request.resource.data.reminderDaysBefore is int
+        && request.resource.data.reminderDaysBefore >= 0
+        && request.resource.data.reminderDaysBefore <= 365
+        && (!('notes' in request.resource.data) || isOptionalString(request.resource.data.notes, 500));
+
+      allow delete: if resourceBelongsToCurrentUser();
+    }
+
+    match /maintenance/{maintenanceId} {
+      allow read: if resourceBelongsToCurrentUser();
+
+      allow create: if requestBelongsToCurrentUser()
+        && hasAllKeys([
+          'userId',
+          'vehicleId',
+          'title',
+          'date',
+          'cost',
+          'mileageAtService',
+          'createdAt'
+        ])
+        && hasOnlyKeys([
+          'userId',
+          'vehicleId',
+          'title',
+          'description',
+          'date',
+          'cost',
+          'mileageAtService',
+          'nextDueDate',
+          'nextDueMileage',
+          'createdAt'
+        ])
+        && isNonEmptyString(request.resource.data.vehicleId, 80)
+        && isNonEmptyString(request.resource.data.title, 100)
+        && (!('description' in request.resource.data) || isOptionalString(request.resource.data.description, 500))
+        && request.resource.data.date is timestamp
+        && isPositiveNumber(request.resource.data.cost)
+        && isPositiveNumber(request.resource.data.mileageAtService)
+        && (!('nextDueDate' in request.resource.data) || request.resource.data.nextDueDate is timestamp)
+        && (!('nextDueMileage' in request.resource.data) || isPositiveNumber(request.resource.data.nextDueMileage))
+        && request.resource.data.createdAt is timestamp;
+
+      allow update: if resourceBelongsToCurrentUser()
+        && requestBelongsToCurrentUser()
+        && request.resource.data.userId == resource.data.userId
+        && request.resource.data.vehicleId == resource.data.vehicleId
+        && request.resource.data.createdAt == resource.data.createdAt
+        && hasOnlyKeys([
+          'userId',
+          'vehicleId',
+          'title',
+          'description',
+          'date',
+          'cost',
+          'mileageAtService',
+          'nextDueDate',
+          'nextDueMileage',
+          'createdAt'
+        ])
+        && isNonEmptyString(request.resource.data.title, 100)
+        && (!('description' in request.resource.data) || isOptionalString(request.resource.data.description, 500))
+        && request.resource.data.date is timestamp
+        && isPositiveNumber(request.resource.data.cost)
+        && isPositiveNumber(request.resource.data.mileageAtService)
+        && (!('nextDueDate' in request.resource.data) || request.resource.data.nextDueDate is timestamp)
+        && (!('nextDueMileage' in request.resource.data) || isPositiveNumber(request.resource.data.nextDueMileage));
+
+      allow delete: if resourceBelongsToCurrentUser();
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

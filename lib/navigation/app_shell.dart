@@ -35,8 +35,16 @@ class AppShell extends StatelessWidget {
         route: RouteNames.statistics),
   ];
 
+  static const _noTabRoutes = [
+    RouteNames.assistant,
+    RouteNames.profile,
+  ];
+
   int _selectedIndex(BuildContext context) {
     final location = GoRouterState.of(context).matchedLocation;
+
+    if (_noTabRoutes.any((r) => location.startsWith(r))) return -1;
+
     for (int i = 0; i < _navItems.length; i++) {
       if (location.startsWith(_navItems[i].route)) return i;
     }

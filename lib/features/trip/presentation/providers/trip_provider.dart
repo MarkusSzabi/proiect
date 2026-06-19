@@ -10,8 +10,6 @@ import '../../domain/entities/trip.dart';
 import '../../domain/repositories/trip_repository.dart';
 import '../../domain/usecases/trip_usecases.dart';
 
-// ── Infrastructure ────────────────────────────────────────
-
 final tripDataSourceProvider = Provider<TripRemoteDataSource>((ref) {
   return TripRemoteDataSourceImpl(ref.read(firestoreProvider));
 });
@@ -19,8 +17,6 @@ final tripDataSourceProvider = Provider<TripRemoteDataSource>((ref) {
 final tripRepositoryProvider = Provider<TripRepository>((ref) {
   return TripRepositoryImpl(ref.read(tripDataSourceProvider));
 });
-
-// ── Use cases ─────────────────────────────────────────────
 
 final getTripsUseCaseProvider = Provider<GetTripsUseCase>((ref) {
   return GetTripsUseCase(ref.read(tripRepositoryProvider));
@@ -38,22 +34,18 @@ final deleteTripUseCaseProvider = Provider<DeleteTripUseCase>((ref) {
   return DeleteTripUseCase(ref.read(tripRepositoryProvider));
 });
 
-// ── Stream curse ──────────────────────────────────────────
-
 final tripsStreamProvider = StreamProvider<List<Trip>>((ref) {
   final activeVehicle = ref.watch(activeVehicleProvider);
   if (activeVehicle == null) return Stream.value([]);
   return ref.read(getTripsUseCaseProvider).execute(activeVehicle.id);
 });
 
-// ── GPS Tracking State ────────────────────────────────────
-
 enum TripStatus {
   idle,
   requesting,
-  gpsFailure, // GPS esuat - asteapta input manual
-  active, // GPS activ
-  activeManual, // Manual mode
+  gpsFailure,
+  active,
+  activeManual,
   paused,
   saving,
 }
@@ -135,8 +127,6 @@ class TripNotifier extends StateNotifier<ActiveTripState> {
     return true;
   }
 
-  // ── Start cu GPS ──────────────────────────────────────
-
   Future<void> startTrip() async {
     state = state.copyWith(status: TripStatus.requesting, errorMessage: null);
 
@@ -160,7 +150,6 @@ class TripNotifier extends StateNotifier<ActiveTripState> {
       return;
     }
 
-    // Incearca sa obtina pozitia cu timeout de 8 secunde
     Position? startPos;
     String? startLocationName;
     try {
@@ -170,7 +159,6 @@ class TripNotifier extends StateNotifier<ActiveTripState> {
       startLocationName =
           '${startPos.latitude.toStringAsFixed(4)}, ${startPos.longitude.toStringAsFixed(4)}';
     } catch (_) {
-      // GPS timeout — trece la gpsFailure
       state = state.copyWith(
         status: TripStatus.gpsFailure,
         errorMessage: 'GPS signal weak. Use manual mode or try again.',
@@ -187,8 +175,6 @@ class TripNotifier extends StateNotifier<ActiveTripState> {
     _lastPosition = startPos;
     _startTracking(trip, TripStatus.active, startLocationName);
   }
-
-  // ── Start Manual ──────────────────────────────────────
 
   Future<void> startTripManual({
     required String startLocation,
@@ -220,7 +206,6 @@ class TripNotifier extends StateNotifier<ActiveTripState> {
       endLocation: endLocation,
     );
 
-    // In manual mode, incearca GPS in background daca devine disponibil
     _tryGpsInBackground();
   }
 
@@ -286,15 +271,14 @@ class TripNotifier extends StateNotifier<ActiveTripState> {
           state = state.copyWith(status: TripStatus.active);
           _startGpsStream();
         }
-      } catch (_) {
-        // GPS inca indisponibil, ramane manual
-      }
+      } catch (_) {}
     });
   }
 
-  // ── Stop ─────────────────────────────────────────────
-
-  Future<void> stopTrip({String? endLocation}) async {
+  Future<void> stopTrip({
+    String? endLocation,
+    double? manualDistanceKm,
+  }) async {
     if (state.currentTrip == null) return;
 
     state = state.copyWith(status: TripStatus.saving);
@@ -304,21 +288,27 @@ class TripNotifier extends StateNotifier<ActiveTripState> {
     _positionSub = null;
     _timer = null;
 
+    final finalDistance = (manualDistanceKm != null && manualDistanceKm > 0)
+        ? manualDistanceKm
+        : state.distanceKm;
+
+    final endTime = DateTime.now();
+
     final updatedTrip = state.currentTrip!.copyWith(
-      endTime: DateTime.now(),
-      distanceKm: state.distanceKm,
+      endTime: endTime,
+      distanceKm: finalDistance,
       isActive: false,
       endLocationName: endLocation ?? state.endLocation,
     );
 
     await _ref.read(updateTripUseCaseProvider).execute(updatedTrip);
 
-    if (state.distanceKm > 0) {
+    if (finalDistance > 0) {
       final vehicle = _ref.read(activeVehicleProvider);
       if (vehicle != null) {
         await _ref
             .read(vehicleRepositoryProvider)
-            .updateMileage(vehicle.id, state.distanceKm);
+            .updateMileage(vehicle.id, finalDistance);
       }
     }
 
@@ -338,6 +328,8 @@ class TripNotifier extends StateNotifier<ActiveTripState> {
 }
 
 final tripNotifierProvider =
-    StateNotifierProvider<TripNotifier, ActiveTripState>((ref) {
-  return TripNotifier(ref);
-});
+    StateNotifierProvider<TripNotifier, ActiveTripState>(
+  (ref) => TripNotifier(ref),
+);
+
+final activeTripProvider = tripNotifierProvider;

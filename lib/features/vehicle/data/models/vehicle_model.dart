@@ -64,20 +64,28 @@ class VehicleModel extends Vehicle {
         updatedAt: v.updatedAt,
       );
 
-  Map<String, dynamic> toFirestore() => {
-        'userId': userId,
-        'make': make,
-        'model': model,
-        'year': year,
-        'licensePlate': licensePlate,
-        'initialMileageKm': initialMileageKm,
-        'currentMileageKm': currentMileageKm,
-        'fuelType': fuelType.name,
-        'color': color,
-        'vin': vin,
-        'photoUrl': photoUrl,
-        'isActive': isActive,
-        'createdAt': Timestamp.fromDate(createdAt),
-        'updatedAt': FieldValue.serverTimestamp(),
-      };
+  Map<String, dynamic> toFirestore() {
+    final map = <String, dynamic>{
+      'userId': userId,
+      'make': make,
+      'model': model,
+      'year': year,
+      'licensePlate': licensePlate,
+      'initialMileageKm': initialMileageKm,
+      'currentMileageKm': currentMileageKm,
+      'fuelType': fuelType.name,
+      'isActive': isActive,
+      'createdAt': Timestamp.fromDate(createdAt),
+    };
+
+    if (color != null && color!.trim().isNotEmpty) {
+      map['color'] = color!.trim();
+    }
+
+    if (vin != null && vin!.trim().isNotEmpty) {
+      map['vin'] = vin!.trim();
+    }
+
+    return map;
+  }
 }

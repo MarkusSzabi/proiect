@@ -37,14 +37,18 @@ class DocumentListScreen extends ConsumerWidget {
               foregroundColor: Colors.white,
             ),
       body: activeVehicle == null
-          ? _NoVehiclePrompt()
+          ? const _NoVehiclePrompt()
           : docs.when(
               loading: () => const Center(child: CircularProgressIndicator()),
-              error: (e, _) => Center(child: Text('Error: $e')),
+              error: (e, _) => _ListErrorState(message: 'Error: $e'),
               data: (list) {
                 if (list.isEmpty) return const _EmptyState();
+
+                final sorted = [...list]
+                  ..sort((a, b) => a.expiryDate.compareTo(b.expiryDate));
+
                 return _DocumentsList(
-                  documents: list,
+                  documents: sorted,
                   onDeleted: () => ref.invalidate(documentsProvider),
                   onEdited: () => ref.invalidate(documentsProvider),
                   vehicleId: activeVehicle.id,
@@ -79,103 +83,149 @@ class _DocumentsList extends ConsumerWidget {
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
       children: [
+        _SummaryRow(
+          total: documents.length,
+          expired: expired.length,
+          expiringSoon: expiringSoon.length,
+        ),
+        const SizedBox(height: 18),
         if (expired.isNotEmpty) ...[
-          _GroupHeader(label: 'Expired', color: AppColors.danger),
+          const _GroupHeader(label: 'Expired', color: AppColors.danger),
           const SizedBox(height: 8),
-          ...expired.map((d) => _DocumentTile(
-                document: d,
-                onEdit: () async {
-                  await Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => AddDocumentScreen(
-                        vehicleId: vehicleId,
-                        existingDocument: d,
-                      ),
+          ...expired.map(
+            (d) => _DocumentTile(
+              document: d,
+              onEdit: () async {
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => AddDocumentScreen(
+                      vehicleId: vehicleId,
+                      existingDocument: d,
                     ),
-                  );
-                  onEdited();
-                },
-                onDelete: () async {
-                  final confirmed = await _confirmDelete(context);
-                  if (confirmed) {
-                    await ref
-                        .read(documentNotifierProvider.notifier)
-                        .deleteDocument(d.id);
-                    onDeleted();
+                  ),
+                );
+                onEdited();
+              },
+              onDelete: () async {
+                final confirmed =
+                    await _confirmDelete(context, d.type.displayName);
+                if (confirmed) {
+                  await ref
+                      .read(documentNotifierProvider.notifier)
+                      .deleteDocument(d.id);
+                  onDeleted();
+
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('${d.type.displayName} deleted.'),
+                        backgroundColor: AppColors.danger,
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
                   }
-                },
-              )),
+                }
+              },
+            ),
+          ),
           const SizedBox(height: 16),
         ],
         if (expiringSoon.isNotEmpty) ...[
-          _GroupHeader(label: 'Expiring Soon', color: AppColors.warning),
+          const _GroupHeader(label: 'Expiring Soon', color: AppColors.warning),
           const SizedBox(height: 8),
-          ...expiringSoon.map((d) => _DocumentTile(
-                document: d,
-                onEdit: () async {
-                  await Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => AddDocumentScreen(
-                        vehicleId: vehicleId,
-                        existingDocument: d,
-                      ),
+          ...expiringSoon.map(
+            (d) => _DocumentTile(
+              document: d,
+              onEdit: () async {
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => AddDocumentScreen(
+                      vehicleId: vehicleId,
+                      existingDocument: d,
                     ),
-                  );
-                  onEdited();
-                },
-                onDelete: () async {
-                  final confirmed = await _confirmDelete(context);
-                  if (confirmed) {
-                    await ref
-                        .read(documentNotifierProvider.notifier)
-                        .deleteDocument(d.id);
-                    onDeleted();
+                  ),
+                );
+                onEdited();
+              },
+              onDelete: () async {
+                final confirmed =
+                    await _confirmDelete(context, d.type.displayName);
+                if (confirmed) {
+                  await ref
+                      .read(documentNotifierProvider.notifier)
+                      .deleteDocument(d.id);
+                  onDeleted();
+
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('${d.type.displayName} deleted.'),
+                        backgroundColor: AppColors.danger,
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
                   }
-                },
-              )),
+                }
+              },
+            ),
+          ),
           const SizedBox(height: 16),
         ],
         if (valid.isNotEmpty) ...[
-          _GroupHeader(label: 'Valid', color: AppColors.success),
+          const _GroupHeader(label: 'Valid', color: AppColors.success),
           const SizedBox(height: 8),
-          ...valid.map((d) => _DocumentTile(
-                document: d,
-                onEdit: () async {
-                  await Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => AddDocumentScreen(
-                        vehicleId: vehicleId,
-                        existingDocument: d,
-                      ),
+          ...valid.map(
+            (d) => _DocumentTile(
+              document: d,
+              onEdit: () async {
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => AddDocumentScreen(
+                      vehicleId: vehicleId,
+                      existingDocument: d,
                     ),
-                  );
-                  onEdited();
-                },
-                onDelete: () async {
-                  final confirmed = await _confirmDelete(context);
-                  if (confirmed) {
-                    await ref
-                        .read(documentNotifierProvider.notifier)
-                        .deleteDocument(d.id);
-                    onDeleted();
+                  ),
+                );
+                onEdited();
+              },
+              onDelete: () async {
+                final confirmed =
+                    await _confirmDelete(context, d.type.displayName);
+                if (confirmed) {
+                  await ref
+                      .read(documentNotifierProvider.notifier)
+                      .deleteDocument(d.id);
+                  onDeleted();
+
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('${d.type.displayName} deleted.'),
+                        backgroundColor: AppColors.danger,
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
                   }
-                },
-              )),
+                }
+              },
+            ),
+          ),
         ],
       ],
     );
   }
 
-  Future<bool> _confirmDelete(BuildContext context) async {
+  Future<bool> _confirmDelete(BuildContext context, String docName) async {
     return await showDialog<bool>(
           context: context,
           builder: (_) => AlertDialog(
             title: const Text('Delete Document'),
-            content:
-                const Text('Are you sure you want to delete this document?'),
+            content: Text(
+              'Are you sure you want to delete "$docName"?',
+            ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context, false),
@@ -183,8 +233,10 @@ class _DocumentsList extends ConsumerWidget {
               ),
               TextButton(
                 onPressed: () => Navigator.pop(context, true),
-                child:
-                    Text('Delete', style: TextStyle(color: AppColors.danger)),
+                child: Text(
+                  'Delete',
+                  style: TextStyle(color: AppColors.danger),
+                ),
               ),
             ],
           ),
@@ -193,8 +245,96 @@ class _DocumentsList extends ConsumerWidget {
   }
 }
 
+class _SummaryRow extends StatelessWidget {
+  const _SummaryRow({
+    required this.total,
+    required this.expired,
+    required this.expiringSoon,
+  });
+
+  final int total;
+  final int expired;
+  final int expiringSoon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        _SummaryCard(
+          label: 'Total',
+          value: total.toString(),
+          color: AppColors.primary,
+        ),
+        const SizedBox(width: 10),
+        _SummaryCard(
+          label: 'Expired',
+          value: expired.toString(),
+          color: AppColors.danger,
+        ),
+        const SizedBox(width: 10),
+        _SummaryCard(
+          label: 'Soon',
+          value: expiringSoon.toString(),
+          color: AppColors.warning,
+        ),
+      ],
+    );
+  }
+}
+
+class _SummaryCard extends StatelessWidget {
+  const _SummaryCard({
+    required this.label,
+    required this.value,
+    required this.color,
+  });
+
+  final String label;
+  final String value;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: color.withValues(alpha: 0.18)),
+        ),
+        child: Column(
+          children: [
+            Text(
+              value,
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                color: color,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 11,
+                color: AppColors.onSurfaceVariant,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _GroupHeader extends StatelessWidget {
-  const _GroupHeader({required this.label, required this.color});
+  const _GroupHeader({
+    required this.label,
+    required this.color,
+  });
+
   final String label;
   final Color color;
 
@@ -205,7 +345,10 @@ class _GroupHeader extends StatelessWidget {
         Container(
           width: 8,
           height: 8,
-          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+          decoration: BoxDecoration(
+            color: color,
+            shape: BoxShape.circle,
+          ),
         ),
         const SizedBox(width: 8),
         Text(
@@ -237,22 +380,16 @@ class _DocumentTile extends StatelessWidget {
     switch (type) {
       case DocumentType.insurance:
         return Icons.shield_outlined;
-
       case DocumentType.itp:
         return Icons.fact_check_outlined;
-
       case DocumentType.rovinieta:
         return Icons.route_outlined;
-
       case DocumentType.rcaCard:
         return Icons.description_outlined;
-
       case DocumentType.registrationCertificate:
         return Icons.app_registration_outlined;
-
       case DocumentType.drivingLicense:
         return Icons.credit_card_outlined;
-
       case DocumentType.other:
         return Icons.folder_outlined;
     }
@@ -291,7 +428,6 @@ class _DocumentTile extends StatelessWidget {
               color: statusColor.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(12),
             ),
-            // ── NOU: Icon în loc de Text(emoji) ──────────
             child: Icon(
               _iconFor(document.type),
               color: statusColor,
@@ -306,18 +442,25 @@ class _DocumentTile extends StatelessWidget {
                 Text(
                   document.type.displayName,
                   style: const TextStyle(
-                      fontSize: 14, fontWeight: FontWeight.w600),
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
                 const SizedBox(height: 4),
                 Row(
                   children: [
-                    Icon(Icons.calendar_today_outlined,
-                        size: 11, color: AppColors.onSurfaceVariant),
+                    Icon(
+                      Icons.calendar_today_outlined,
+                      size: 11,
+                      color: AppColors.onSurfaceVariant,
+                    ),
                     const SizedBox(width: 4),
                     Text(
                       'Expires: $expiryStr',
                       style: TextStyle(
-                          fontSize: 12, color: AppColors.onSurfaceVariant),
+                        fontSize: 12,
+                        color: AppColors.onSurfaceVariant,
+                      ),
                     ),
                   ],
                 ),
@@ -342,18 +485,26 @@ class _DocumentTile extends StatelessWidget {
             ),
           ),
           PopupMenuButton<String>(
-            icon: Icon(Icons.more_vert,
-                color: AppColors.onSurfaceVariant, size: 20),
+            icon: Icon(
+              Icons.more_vert,
+              color: AppColors.onSurfaceVariant,
+              size: 20,
+            ),
             onSelected: (v) {
               if (v == 'edit') onEdit();
               if (v == 'delete') onDelete();
             },
             itemBuilder: (_) => [
-              const PopupMenuItem(value: 'edit', child: Text('Edit')),
+              const PopupMenuItem(
+                value: 'edit',
+                child: Text('Edit'),
+              ),
               PopupMenuItem(
                 value: 'delete',
-                child:
-                    Text('Delete', style: TextStyle(color: AppColors.danger)),
+                child: Text(
+                  'Delete',
+                  style: TextStyle(color: AppColors.danger),
+                ),
               ),
             ],
           ),
@@ -369,38 +520,134 @@ class _EmptyState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.folder_outlined, size: 64, color: Colors.grey.shade300),
-          const SizedBox(height: 16),
-          const Text('No documents yet',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-          const SizedBox(height: 8),
-          Text('Tap + to add your first document',
-              style: TextStyle(color: Colors.grey.shade500)),
-        ],
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 84,
+              height: 84,
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.10),
+                borderRadius: BorderRadius.circular(24),
+              ),
+              child: Icon(
+                Icons.folder_outlined,
+                size: 40,
+                color: AppColors.primary,
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'No documents yet',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Tap the add button to save your first insurance, ITP, rovinieta, or other document.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: AppColors.onSurfaceVariant,
+                height: 1.5,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 }
 
 class _NoVehiclePrompt extends StatelessWidget {
+  const _NoVehiclePrompt();
+
   @override
   Widget build(BuildContext context) {
     return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.directions_car_outlined,
-              size: 64, color: Colors.grey.shade300),
-          const SizedBox(height: 16),
-          const Text('No vehicle selected',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-          const SizedBox(height: 8),
-          Text('Add a vehicle first to manage documents',
-              style: TextStyle(color: Colors.grey.shade500)),
-        ],
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 84,
+              height: 84,
+              decoration: BoxDecoration(
+                color: AppColors.surfaceVariant,
+                borderRadius: BorderRadius.circular(24),
+              ),
+              child: Icon(
+                Icons.directions_car_outlined,
+                size: 40,
+                color: AppColors.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'No vehicle selected',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Add or select a vehicle first to manage its documents.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: AppColors.onSurfaceVariant,
+                height: 1.5,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ListErrorState extends StatelessWidget {
+  const _ListErrorState({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.error_outline,
+              size: 42,
+              color: AppColors.danger,
+            ),
+            const SizedBox(height: 14),
+            const Text(
+              'Could not load documents',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 13,
+                color: AppColors.onSurfaceVariant,
+                height: 1.5,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -2,8 +2,6 @@ import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 
-// ── Message model ─────────────────────────────────────────
-
 enum MessageRole { user, assistant }
 
 class ChatMessage {
@@ -29,8 +27,6 @@ class ChatMessage {
   }
 }
 
-// ── Chat state ────────────────────────────────────────────
-
 class ChatState {
   const ChatState({
     this.messages = const [],
@@ -55,13 +51,12 @@ class ChatState {
   }
 }
 
-
 class AssistantNotifier extends StateNotifier<ChatState> {
   AssistantNotifier() : super(const ChatState());
 
-  static const _apiKey =
-      'AQ.Ab8RN6KlZGuLVEor1kIKizIt7xlnD8KfpwI6plri4x4HpBdJNw';
   static const _model = 'gemini-2.0-flash';
+  static const _apiKey = String.fromEnvironment('GEMINI_API_KEY');
+
   static String get _apiUrl =>
       'https://generativelanguage.googleapis.com/v1beta/models/$_model:generateContent?key=$_apiKey';
 
@@ -115,6 +110,12 @@ class AssistantNotifier extends StateNotifier<ChatState> {
   Future<void> sendMessage(String userInput) async {
     if (userInput.trim().isEmpty) return;
 
+    if (_apiKey.isEmpty) {
+      _handleError(
+          'API key not configured. Run with --dart-define=GEMINI_API_KEY=your_key');
+      return;
+    }
+
     final userMessage = ChatMessage(
       role: MessageRole.user,
       content: userInput.trim(),
@@ -153,7 +154,7 @@ class AssistantNotifier extends StateNotifier<ChatState> {
 
       for (final msg in state.messages) {
         if (msg.isLoading) continue;
-        if (msg == userMessage) continue; // skip ultimul msg, adăugat mai jos
+        if (msg == userMessage) continue;
         contents.add({
           'role': msg.role == MessageRole.user ? 'user' : 'model',
           'parts': [
@@ -162,7 +163,6 @@ class AssistantNotifier extends StateNotifier<ChatState> {
         });
       }
 
-      // Adaugă mesajul curent
       contents.add({
         'role': 'user',
         'parts': [
@@ -170,7 +170,6 @@ class AssistantNotifier extends StateNotifier<ChatState> {
         ],
       });
 
-      // ✅ Headers Gemini — doar Content-Type, fără x-api-key
       final response = await http.post(
         Uri.parse(_apiUrl),
         headers: {'Content-Type': 'application/json'},
@@ -196,7 +195,7 @@ class AssistantNotifier extends StateNotifier<ChatState> {
         );
 
         final updatedMessages = [...state.messages];
-        updatedMessages.removeLast(); // scoate loading bubble
+        updatedMessages.removeLast();
         updatedMessages.add(assistantMessage);
 
         state = state.copyWith(
@@ -204,7 +203,6 @@ class AssistantNotifier extends StateNotifier<ChatState> {
           isLoading: false,
         );
       } else {
-        // Afișează eroarea exactă din răspuns pentru debugging
         final errorData = jsonDecode(response.body);
         final errorMsg = errorData['error']?['message'] ??
             'API Error ${response.statusCode}';
@@ -220,7 +218,6 @@ class AssistantNotifier extends StateNotifier<ChatState> {
     if (updatedMessages.isNotEmpty && updatedMessages.last.isLoading) {
       updatedMessages.removeLast();
     }
-
     state = state.copyWith(
       messages: updatedMessages,
       isLoading: false,

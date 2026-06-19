@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
-import '../../../../core/constants/route_names.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../vehicle/presentation/providers/vehicle_provider.dart';
 import '../../domain/entities/trip.dart';
@@ -41,33 +39,35 @@ class TripListScreen extends ConsumerWidget {
       ),
       body: Column(
         children: [
-          // ── Banner cursă activă ───────────────────────
           if (tripState.isTracking)
             _ActiveTripBanner(
               state: tripState,
               onTap: () => _openActiveTrip(context),
             ),
-
-          // ── Lista curse ───────────────────────────────
           Expanded(
             child: activeVehicle == null
                 ? const _NoVehiclePrompt()
                 : trips.when(
                     loading: () => const Center(
-                        child: CircularProgressIndicator(
-                            color: AppColors.primary)),
-                    error: (e, _) => Center(
-                        child: Text('Error: $e',
-                            style: const TextStyle(
-                                color: AppColors.onSurfaceVariant))),
+                      child: CircularProgressIndicator(
+                        color: AppColors.primary,
+                      ),
+                    ),
+                    error: (e, _) => _ErrorState(message: 'Error: $e'),
                     data: (list) {
-                      final finished = list.where((t) => !t.isActive).toList();
+                      final finished = list.where((t) => !t.isActive).toList()
+                        ..sort((a, b) => b.startTime.compareTo(a.startTime));
+
                       if (finished.isEmpty) {
                         return _EmptyState(
                           onStart: () => _openActiveTrip(context),
                         );
                       }
-                      return _TripsList(trips: finished, ref: ref);
+
+                      return _TripsList(
+                        trips: finished,
+                        ref: ref,
+                      );
                     },
                   ),
           ),
@@ -82,7 +82,9 @@ class TripListScreen extends ConsumerWidget {
                     ? Icons.gps_fixed
                     : Icons.play_arrow_rounded,
               ),
-              label: Text(tripState.isTracking ? 'Live Trip' : 'New Trip'),
+              label: Text(
+                tripState.isTracking ? 'Live Trip' : 'New Trip',
+              ),
               backgroundColor:
                   tripState.isTracking ? AppColors.danger : AppColors.primary,
               foregroundColor: Colors.white,
@@ -90,14 +92,10 @@ class TripListScreen extends ConsumerWidget {
     );
   }
 
-  // ── Deschide ActiveTripScreen o singură dată ──────────
   static void _openActiveTrip(BuildContext context) {
-    // Verifică dacă ActiveTripScreen e deja în stack
-    // ca să evităm loop-ul infinit
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => const ActiveTripScreen(),
-        // fullscreenDialog previne dubla navigare din ShellRoute
         fullscreenDialog: true,
       ),
     );
@@ -105,61 +103,78 @@ class TripListScreen extends ConsumerWidget {
 }
 
 class _ActiveTripBanner extends StatelessWidget {
-  const _ActiveTripBanner({required this.state, required this.onTap});
+  const _ActiveTripBanner({
+    required this.state,
+    required this.onTap,
+  });
+
   final ActiveTripState state;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        decoration: BoxDecoration(
-          color: AppColors.danger.withValues(alpha: 0.12),
-          border: Border(
+    return Material(
+      color: AppColors.danger.withValues(alpha: 0.10),
+      child: InkWell(
+        onTap: onTap,
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: BoxDecoration(
+            border: Border(
               bottom: BorderSide(
-                  color: AppColors.danger.withValues(alpha: 0.3), width: 0.8)),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 8,
-              height: 8,
-              decoration: const BoxDecoration(
-                color: AppColors.danger,
-                shape: BoxShape.circle,
+                color: AppColors.danger.withValues(alpha: 0.25),
+                width: 0.8,
               ),
             ),
-            const SizedBox(width: 10),
-            const Icon(Icons.gps_fixed, color: AppColors.danger, size: 18),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Trip in progress',
-                    style: TextStyle(
-                      color: AppColors.danger,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 13,
-                      fontFamily: 'Poppins',
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 10,
+                height: 10,
+                decoration: const BoxDecoration(
+                  color: AppColors.danger,
+                  shape: BoxShape.circle,
+                ),
+              ),
+              const SizedBox(width: 10),
+              const Icon(
+                Icons.gps_fixed,
+                color: AppColors.danger,
+                size: 18,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Trip in progress',
+                      style: TextStyle(
+                        color: AppColors.danger,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13,
+                        fontFamily: 'Poppins',
+                      ),
                     ),
-                  ),
-                  Text(
-                    '${state.distanceDisplay} · ${state.elapsedDisplay}',
-                    style: const TextStyle(
+                    Text(
+                      '${state.distanceDisplay} · ${state.elapsedDisplay}',
+                      style: const TextStyle(
                         color: AppColors.onSurfaceVariant,
                         fontSize: 12,
-                        fontFamily: 'Poppins'),
-                  ),
-                ],
+                        fontFamily: 'Poppins',
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-            const Icon(Icons.chevron_right, color: AppColors.onSurfaceVariant),
-          ],
+              const Icon(
+                Icons.chevron_right,
+                color: AppColors.onSurfaceVariant,
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -167,7 +182,11 @@ class _ActiveTripBanner extends StatelessWidget {
 }
 
 class _TripsList extends StatelessWidget {
-  const _TripsList({required this.trips, required this.ref});
+  const _TripsList({
+    required this.trips,
+    required this.ref,
+  });
+
   final List<Trip> trips;
   final WidgetRef ref;
 
@@ -178,15 +197,30 @@ class _TripsList extends StatelessWidget {
       final key = DateFormat('MMMM yyyy').format(t.startTime);
       grouped.putIfAbsent(key, () => []).add(t);
     }
+
     final months = grouped.keys.toList();
+
+    final totalTrips = trips.length;
+    final totalKm = trips.fold<double>(0, (sum, t) => sum + t.distanceKm);
 
     return ListView.builder(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
-      itemCount: months.length,
+      itemCount: months.length + 1,
       itemBuilder: (_, i) {
-        final month = months[i];
+        if (i == 0) {
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 18),
+            child: _TripSummaryRow(
+              totalTrips: totalTrips,
+              totalKm: totalKm,
+            ),
+          );
+        }
+
+        final month = months[i - 1];
         final monthTrips = grouped[month]!;
-        final totalKm = monthTrips.fold(0.0, (sum, t) => sum + t.distanceKm);
+        final monthKm =
+            monthTrips.fold<double>(0, (sum, t) => sum + t.distanceKm);
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -207,7 +241,7 @@ class _TripsList extends StatelessWidget {
                     ),
                   ),
                   Text(
-                    '${totalKm.toStringAsFixed(1)} km total',
+                    '${monthKm.toStringAsFixed(1)} km total',
                     style: const TextStyle(
                       fontSize: 12,
                       color: AppColors.onSurfaceVariant,
@@ -217,17 +251,28 @@ class _TripsList extends StatelessWidget {
                 ],
               ),
             ),
-            ...monthTrips.map((t) => _TripTile(
-                  trip: t,
-                  onDelete: () async {
-                    final confirmed = await _confirmDelete(context);
-                    if (confirmed) {
-                      await ref
-                          .read(tripNotifierProvider.notifier)
-                          .deleteTrip(t.id);
+            ...monthTrips.map(
+              (t) => _TripTile(
+                trip: t,
+                onDelete: () async {
+                  final confirmed = await _confirmDelete(context);
+                  if (confirmed) {
+                    await ref
+                        .read(tripNotifierProvider.notifier)
+                        .deleteTrip(t.id);
+
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Trip deleted.'),
+                          behavior: SnackBarBehavior.floating,
+                        ),
+                      );
                     }
-                  },
-                )),
+                  }
+                },
+              ),
+            ),
             const SizedBox(height: 8),
           ],
         );
@@ -240,12 +285,20 @@ class _TripsList extends StatelessWidget {
           context: context,
           builder: (_) => AlertDialog(
             backgroundColor: AppColors.surface,
-            title: const Text('Delete Trip',
-                style: TextStyle(
-                    color: AppColors.onSurface, fontFamily: 'Poppins')),
-            content: const Text('Are you sure you want to delete this trip?',
-                style: TextStyle(
-                    color: AppColors.onSurfaceVariant, fontFamily: 'Poppins')),
+            title: const Text(
+              'Delete Trip',
+              style: TextStyle(
+                color: AppColors.onSurface,
+                fontFamily: 'Poppins',
+              ),
+            ),
+            content: const Text(
+              'Are you sure you want to delete this trip?',
+              style: TextStyle(
+                color: AppColors.onSurfaceVariant,
+                fontFamily: 'Poppins',
+              ),
+            ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context, false),
@@ -253,8 +306,10 @@ class _TripsList extends StatelessWidget {
               ),
               TextButton(
                 onPressed: () => Navigator.pop(context, true),
-                child:
-                    Text('Delete', style: TextStyle(color: AppColors.danger)),
+                child: Text(
+                  'Delete',
+                  style: TextStyle(color: AppColors.danger),
+                ),
               ),
             ],
           ),
@@ -263,8 +318,98 @@ class _TripsList extends StatelessWidget {
   }
 }
 
+class _TripSummaryRow extends StatelessWidget {
+  const _TripSummaryRow({
+    required this.totalTrips,
+    required this.totalKm,
+  });
+
+  final int totalTrips;
+  final double totalKm;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        _SummaryCard(
+          label: 'Trips',
+          value: totalTrips.toString(),
+          icon: Icons.route_outlined,
+          color: AppColors.primary,
+        ),
+        const SizedBox(width: 10),
+        _SummaryCard(
+          label: 'Distance',
+          value: '${totalKm.toStringAsFixed(1)} km',
+          icon: Icons.straighten,
+          color: AppColors.success,
+        ),
+      ],
+    );
+  }
+}
+
+class _SummaryCard extends StatelessWidget {
+  const _SummaryCard({
+    required this.label,
+    required this.value,
+    required this.icon,
+    required this.color,
+  });
+
+  final String label;
+  final String value;
+  final IconData icon;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: color.withValues(alpha: 0.16),
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(icon, size: 18, color: color),
+            const SizedBox(height: 10),
+            Text(
+              value,
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                color: color,
+                fontFamily: 'Poppins',
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 12,
+                color: AppColors.onSurfaceVariant,
+                fontFamily: 'Poppins',
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _TripTile extends StatelessWidget {
-  const _TripTile({required this.trip, required this.onDelete});
+  const _TripTile({
+    required this.trip,
+    required this.onDelete,
+  });
+
   final Trip trip;
   final VoidCallback onDelete;
 
@@ -279,19 +424,31 @@ class _TripTile extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.outline.withValues(alpha: 0.3)),
+        border: Border.all(
+          color: AppColors.outline.withValues(alpha: 0.3),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
       ),
       child: Row(
         children: [
           Container(
-            width: 44,
-            height: 44,
+            width: 46,
+            height: 46,
             decoration: BoxDecoration(
               color: AppColors.primary.withValues(alpha: 0.08),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: const Icon(Icons.route_outlined,
-                color: AppColors.primary, size: 22),
+            child: const Icon(
+              Icons.route_outlined,
+              color: AppColors.primary,
+              size: 22,
+            ),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -301,34 +458,54 @@ class _TripTile extends StatelessWidget {
                 Text(
                   trip.distanceDisplay,
                   style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.onSurface,
-                      fontFamily: 'Poppins'),
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.onSurface,
+                    fontFamily: 'Poppins',
+                  ),
                 ),
-                const SizedBox(height: 3),
-                Row(
+                const SizedBox(height: 4),
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 4,
                   children: [
-                    const Icon(Icons.calendar_today_outlined,
-                        size: 11, color: AppColors.onSurfaceVariant),
-                    const SizedBox(width: 4),
-                    Text(
-                      '$dateStr · $timeStr',
-                      style: const TextStyle(
-                          fontSize: 12,
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.calendar_today_outlined,
+                          size: 11,
                           color: AppColors.onSurfaceVariant,
-                          fontFamily: 'Poppins'),
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          '$dateStr · $timeStr',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: AppColors.onSurfaceVariant,
+                            fontFamily: 'Poppins',
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: 12),
-                    const Icon(Icons.timer_outlined,
-                        size: 11, color: AppColors.onSurfaceVariant),
-                    const SizedBox(width: 4),
-                    Text(
-                      trip.durationDisplay,
-                      style: const TextStyle(
-                          fontSize: 12,
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.timer_outlined,
+                          size: 11,
                           color: AppColors.onSurfaceVariant,
-                          fontFamily: 'Poppins'),
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          trip.durationDisplay,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: AppColors.onSurfaceVariant,
+                            fontFamily: 'Poppins',
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -336,8 +513,11 @@ class _TripTile extends StatelessWidget {
             ),
           ),
           IconButton(
-            icon: const Icon(Icons.delete_outline,
-                color: AppColors.onSurfaceVariant, size: 20),
+            icon: const Icon(
+              Icons.delete_outline,
+              color: AppColors.onSurfaceVariant,
+              size: 20,
+            ),
             onPressed: onDelete,
           ),
         ],
@@ -348,61 +528,69 @@ class _TripTile extends StatelessWidget {
 
 class _EmptyState extends StatelessWidget {
   const _EmptyState({required this.onStart});
+
   final VoidCallback onStart;
 
   @override
   Widget build(BuildContext context) {
     return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 80,
-            height: 80,
-            decoration: BoxDecoration(
-              color: AppColors.primary.withValues(alpha: 0.10),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(Icons.route_outlined,
-                size: 36, color: AppColors.primaryLight),
-          ),
-          const SizedBox(height: 16),
-          const Text(
-            'No trips yet',
-            style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                color: AppColors.onSurface,
-                fontFamily: 'Poppins'),
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            'Tap the button below to start your first trip',
-            style: TextStyle(
-                color: AppColors.onSurfaceVariant, fontFamily: 'Poppins'),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 24),
-          GestureDetector(
-            onTap: onStart,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 82,
+              height: 82,
               decoration: BoxDecoration(
-                gradient: AppColors.primaryGradient,
-                borderRadius: BorderRadius.circular(12),
+                color: AppColors.primary.withValues(alpha: 0.10),
+                shape: BoxShape.circle,
               ),
-              child: const Text(
-                'Start First Trip',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.white,
-                  fontFamily: 'Poppins',
+              child: const Icon(
+                Icons.route_outlined,
+                size: 36,
+                color: AppColors.primary,
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'No trips yet',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                color: AppColors.onSurface,
+                fontFamily: 'Poppins',
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Start your first trip to see distance and duration history here.',
+              style: TextStyle(
+                color: AppColors.onSurfaceVariant,
+                fontFamily: 'Poppins',
+                height: 1.5,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 22),
+            ElevatedButton.icon(
+              onPressed: onStart,
+              icon: const Icon(Icons.play_arrow_rounded),
+              label: const Text('Start First Trip'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 12,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
                 ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -414,35 +602,92 @@ class _NoVehiclePrompt extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 80,
-            height: 80,
-            decoration: BoxDecoration(
-              color: AppColors.surfaceVariant,
-              shape: BoxShape.circle,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 82,
+              height: 82,
+              decoration: BoxDecoration(
+                color: AppColors.surfaceVariant,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.directions_car_outlined,
+                size: 36,
+                color: AppColors.onSurfaceMuted,
+              ),
             ),
-            child: const Icon(Icons.directions_car_outlined,
-                size: 36, color: AppColors.onSurfaceMuted),
-          ),
-          const SizedBox(height: 16),
-          const Text(
-            'No vehicle selected',
-            style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
+            const SizedBox(height: 16),
+            const Text(
+              'No vehicle selected',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
                 color: AppColors.onSurface,
-                fontFamily: 'Poppins'),
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            'Add a vehicle first to track trips',
-            style: TextStyle(
-                color: AppColors.onSurfaceVariant, fontFamily: 'Poppins'),
-          ),
-        ],
+                fontFamily: 'Poppins',
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Add a vehicle first to track trips.',
+              style: TextStyle(
+                color: AppColors.onSurfaceVariant,
+                fontFamily: 'Poppins',
+                height: 1.5,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ErrorState extends StatelessWidget {
+  const _ErrorState({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.error_outline,
+              size: 42,
+              color: AppColors.danger,
+            ),
+            const SizedBox(height: 14),
+            const Text(
+              'Could not load trips',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                color: AppColors.onSurface,
+                fontFamily: 'Poppins',
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 13,
+                color: AppColors.onSurfaceVariant,
+                fontFamily: 'Poppins',
+                height: 1.5,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

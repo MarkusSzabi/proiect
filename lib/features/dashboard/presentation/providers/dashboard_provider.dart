@@ -26,26 +26,28 @@ final dashboardStatsProvider = Provider<DashboardStats>((ref) {
   final activeVehicle = ref.watch(activeVehicleProvider);
   if (activeVehicle == null) return const DashboardStats();
 
-  // ── Total km din vehicul ──────────────────────────────
   final totalKm = activeVehicle.currentMileageKm;
 
-  // ── Trips luna aceasta pentru vehiculul activ ─────────
   final tripsAsync = ref.watch(tripsStreamProvider);
   final trips = tripsAsync.valueOrNull ?? [];
   final now = DateTime.now();
+
   final thisMonthTrips = trips
       .where((t) =>
           !t.isActive &&
+          t.endTime != null &&
           t.startTime.year == now.year &&
           t.startTime.month == now.month)
       .toList();
 
   final tripsThisMonth = thisMonthTrips.length;
   final kmThisMonth = thisMonthTrips.fold(0.0, (sum, t) => sum + t.distanceKm);
-  final drivingHoursThisMonth =
-      thisMonthTrips.fold(0.0, (sum, t) => sum + t.duration.inMinutes / 60.0);
 
-  // ── Maintenance alerts pentru vehiculul activ ─────────
+  final drivingHoursThisMonth = thisMonthTrips.fold(0.0, (sum, t) {
+    if (t.endTime == null) return sum;
+    return sum + t.endTime!.difference(t.startTime).inMinutes / 60.0;
+  });
+
   final maintenanceAsync = ref.watch(maintenanceRecordsProvider);
   final maintenance = maintenanceAsync.valueOrNull ?? [];
   final maintenanceAlertsCount =

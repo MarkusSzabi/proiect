@@ -28,17 +28,24 @@ class VehicleRemoteDataSourceImpl implements VehicleRemoteDataSource {
 
   @override
   Future<VehicleModel> saveVehicle(VehicleModel model) async {
+    final ref = _vehicles.doc(model.id);
+    final doc = await ref.get();
     final data = model.toFirestore();
-    await _vehicles.doc(model.id).set(data, SetOptions(merge: true));
-    final doc = await _vehicles.doc(model.id).get();
-    return VehicleModel.fromFirestore(doc);
+
+    if (doc.exists) {
+      await ref.update(data);
+    } else {
+      await ref.set(data);
+    }
+
+    final savedDoc = await ref.get();
+    return VehicleModel.fromFirestore(savedDoc);
   }
 
   @override
   Future<void> updateMileage(String vehicleId, double additionalKm) async {
     await _vehicles.doc(vehicleId).update({
       'currentMileageKm': FieldValue.increment(additionalKm),
-      'updatedAt': FieldValue.serverTimestamp(),
     });
   }
 
@@ -47,9 +54,11 @@ class VehicleRemoteDataSourceImpl implements VehicleRemoteDataSource {
     final batch = _firestore.batch();
     final allVehicles =
         await _vehicles.where('userId', isEqualTo: userId).get();
+
     for (final doc in allVehicles.docs) {
       batch.update(doc.reference, {'isActive': false});
     }
+
     batch.update(_vehicles.doc(vehicleId), {'isActive': true});
     await batch.commit();
   }
